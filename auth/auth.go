@@ -13,8 +13,7 @@ import (
 
 	"net/http"
 
-	// Midlewares
-	"github.com/codegangsta/negroni"
+
 
 	//JWt
 	"github.com/dgrijalva/jwt-go"
@@ -51,7 +50,6 @@ type App struct {
 func (app *App) Init() {
 	app.Port = ":8000"
 	// ----------------------------- RSA KEY LOAD --------------------------//
-	// Varia
 	var err error
 	var signKey, verifyKey []byte
 	// Load and parse Private Key
@@ -79,21 +77,7 @@ func (app *App) Init() {
 	}
 }
 
-// Run start the server
-func (app App) Run() {
 
-	//PUBLIC ENDPOINTS
-	http.HandleFunc("/login", app.LoginHandler)
-
-	//PROTECTED ENDPOINTS
-	http.Handle("/resource/", negroni.New(
-		negroni.HandlerFunc(app.ValidateTokenMiddleware),
-		negroni.Wrap(http.HandlerFunc(app.ProtectedHandler)),
-	))
-
-	log.Printf("Now listening at %v", app.Port)
-	http.ListenAndServe(app.Port, nil)
-}
 
 /////////////////////////////////////////////////////////////////////////
 ////////////////////// USER DEFINITION //////////////////////////////////
@@ -104,7 +88,7 @@ type User struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Host string `json:"host"`
-	Auth *Auth  `json:"auth"`
+	Auth *Auth  `json:"-"`
 }
 
 // Auth Struct (MODEL)
@@ -117,16 +101,20 @@ type Auth struct {
 /////////////////////////////////////////////////////////////////////////
 ////////////////// TOKEN AND RESPONSE DEFINITION/////////////////////////
 /////////////////////////////////////////////////////////////////////////
+
+// Response define a default object to response, will be used with Ajax requests
 type Response struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
 	Token   *Token `json:"token"`
 }
 
+// Token store our JWT data
 type Token struct {
 	Token string `json:"token"`
 }
 
+// New is just a trigle to create a response only with the message
 func (resp Response) New(message string) Response {
 	resp.Status = "none"
 	resp.Message = message
@@ -137,13 +125,6 @@ func (resp Response) New(message string) Response {
 /////////////////////////////////////////////////////////////////////////
 ///////////////// LOGIN HANDLER AND CHECKJWT MIDLEWARE //////////////////
 /////////////////////////////////////////////////////////////////////////
-
-//@todo this shit is just to test, DELETE!!
-func (app App) ProtectedHandler(w http.ResponseWriter, r *http.Request) {
-
-	response := Response{}.New("Gained access to protected resource")
-	jsonResponse(response, w)
-}
 
 // LoginHandler handle a standard authentication
 func (app App) LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -207,9 +188,9 @@ func (app App) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 			log.Println("USUÁRIO NÃO CADASTRADO")
 			return
-		} else {
-			log.Printf("%v", err)
 		}
+		log.Printf("%v", err)
+		return
 	}
 
 	auth = Auth{Login: login, Password: password, SecretKey: secretKey}
@@ -224,20 +205,19 @@ func (app App) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		tokenString, err := app.generateToken(user)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintln(w, "Error while signing the token")
+			JSONResponse(Response{Status:"error", Message:"Error signing token", Token:&Token{}}, w)
 			log.Printf("Error signing token: %v\n", err)
 			return
 		}
 		//create a token instance using the token string
 		response := Response{Status: "success", Message: "Authorized Login", Token: &Token{tokenString}}
-		jsonResponse(response, w)
-		log.Println("SUCCESS")
+		JSONResponse(response, w)
+		log.Println("Authorized Login")
 	} else {
 
 		w.WriteHeader(http.StatusForbidden)
-		fmt.Println("Error logging in")
-		fmt.Fprint(w, "Invalid credentials")
-		log.Println("ERROR")
+		log.Printf("Invalid credentials")
+		JSONResponse(Response{Status:"error", Message:"Invalid credentials", Token:&Token{}}, w)
 	}
 
 	log.Printf("Login credentials: %v", authFromRequest)
@@ -259,18 +239,20 @@ func (app App) ValidateTokenMiddleware(w http.ResponseWriter, r *http.Request, n
 			next(w, r)
 		} else {
 			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprint(w, "Token is not valid")
+			log.Printf("Token is not valid")
+			JSONResponse(Response{Status:"error", Message:"Token is not valid", Token:&Token{}}, w)
 		}
 	} else {
 		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprint(w, "Unauthorised access to this resource")
+		fmt.Println("Unauthorised access to this resource")
+		JSONResponse(Response{Status:"error", Message:"Unauthorised access to this resource", Token:&Token{}}, w)
 	}
 }
 
 //--------------------------------------HELPER FUNCTIONS --------------------------------------------//
 
-// jsonResponse take a object, parse to JSON and write it as a response
-func jsonResponse(response interface{}, w http.ResponseWriter) {
+// JSONResponse take a object, parse to JSON and write it as a response
+func JSONResponse(response interface{}, w http.ResponseWriter) {
 
 	json, err := json.Marshal(response)
 	if err != nil {
