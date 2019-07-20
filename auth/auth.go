@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	//ReadFile
@@ -12,8 +13,6 @@ import (
 	"log"
 
 	"net/http"
-
-
 
 	//JWt
 	"github.com/dgrijalva/jwt-go"
@@ -27,6 +26,8 @@ import (
 
 	//encrypt
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/gorilla/sessions"
 )
 
 // Define RSA key path
@@ -34,6 +35,8 @@ const (
 	privKeyPath = "jwtRS256.key"
 	pubKeyPath  = "jwtRS256.key.pub"
 )
+
+var store = sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
 
 /////////////////////////////////////////////////////////////////////////
 ///////////////////// APP DEFINITION ////////////////////////////////////
@@ -44,6 +47,7 @@ type App struct {
 	VerifyKey *rsa.PublicKey  `json:"-"`
 	SignKey   *rsa.PrivateKey `json:"-"`
 	Port      string          `json:"-"`
+	LoginURL  string          `json:"login-url"`
 }
 
 // Init load configuration and key files
@@ -76,8 +80,6 @@ func (app *App) Init() {
 		log.Printf("error parsing RSA private key: %v\n", err)
 	}
 }
-
-
 
 /////////////////////////////////////////////////////////////////////////
 ////////////////////// USER DEFINITION //////////////////////////////////
@@ -205,22 +207,75 @@ func (app App) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		tokenString, err := app.generateToken(user)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			JSONResponse(Response{Status:"error", Message:"Error signing token", Token:&Token{}}, w)
+			JSONResponse(Response{Status: "error", Message: "Error signing token", Token: &Token{}}, w)
 			log.Printf("Error signing token: %v\n", err)
 			return
 		}
 		//create a token instance using the token string
 		response := Response{Status: "success", Message: "Authorized Login", Token: &Token{tokenString}}
+		createCoockie("token", tokenString, w, r)
 		JSONResponse(response, w)
 		log.Println("Authorized Login")
 	} else {
 
 		w.WriteHeader(http.StatusForbidden)
 		log.Printf("Invalid credentials")
-		JSONResponse(Response{Status:"error", Message:"Invalid credentials", Token:&Token{}}, w)
+		JSONResponse(Response{Status: "error", Message: "Invalid credentials", Token: &Token{}}, w)
 	}
 
 	log.Printf("Login credentials: %v", authFromRequest)
+}
+
+// LogoutHandler destroy session and redirect to login url.
+func (app App) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	// Get a session. Get() always returns a session, even if empty.
+	session, err := store.Get(r, "jujuba")
+	if err != nil {
+
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	session.Options.MaxAge = -1
+
+	err = session.Save(r, w)
+	log.Printf("error saving session: %s", err)
+
+	http.Redirect(w, r, app.LoginURL, http.StatusFound)
+}
+
+// ValidateTokenInCookieMiddleware @todo comment
+func (app App) ValidateTokenInCookieMiddleware(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+
+	// Get a session. Get() always returns a session, even if empty.
+	session, err := store.Get(r, "jujuba")
+	if err != nil {
+
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Set some session values.
+	tokenString := fmt.Sprintf("%s", session.Values["token"])
+
+	//validate token
+	token, err := jwt.Parse(tokenString,
+		func(token *jwt.Token) (interface{}, error) {
+			return app.VerifyKey, nil
+		})
+
+	if err == nil {
+		if token.Valid {
+			next(w, r)
+		} else {
+			//w.WriteHeader(http.StatusUnauthorized)
+			http.Redirect(w, r, app.LoginURL, http.StatusFound)
+		}
+	} else {
+		//w.WriteHeader(http.StatusUnauthorized)
+		http.Redirect(w, r, app.LoginURL, http.StatusFound)
+	}
+
 }
 
 // ValidateTokenMiddleware check if the token signature is valid
@@ -240,12 +295,12 @@ func (app App) ValidateTokenMiddleware(w http.ResponseWriter, r *http.Request, n
 		} else {
 			w.WriteHeader(http.StatusUnauthorized)
 			log.Printf("Token is not valid")
-			JSONResponse(Response{Status:"error", Message:"Token is not valid", Token:&Token{}}, w)
+			JSONResponse(Response{Status: "error", Message: "Token is not valid", Token: &Token{}}, w)
 		}
 	} else {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Println("Unauthorised access to this resource")
-		JSONResponse(Response{Status:"error", Message:"Unauthorised access to this resource", Token:&Token{}}, w)
+		JSONResponse(Response{Status: "error", Message: "Unauthorised access to this resource", Token: &Token{}}, w)
 	}
 }
 
@@ -301,4 +356,24 @@ func (app App) generateToken(user User) (string, error) {
 	tokenString, err := signer.SignedString(app.SignKey)
 
 	return tokenString, err
+}
+
+func createCoockie(key string, value string, w http.ResponseWriter, r *http.Request) {
+	// Get a session. Get() always returns a session, even if empty.
+	session, err := store.Get(r, "jujuba")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	session.Options.MaxAge = 3600
+
+	// Set some session values.
+	session.Values[key] = value
+	// Save it before we write to the response/return from the handler.
+	err = session.Save(r, w)
+
+	if err != nil {
+		log.Fatal("failed to save session", err)
+	}
 }
