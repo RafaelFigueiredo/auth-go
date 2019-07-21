@@ -1,37 +1,26 @@
 package main
 
 import (
-	"./auth"
 	"log"
 	"net/http"
-		// Midlewares
-		"github.com/codegangsta/negroni"
+
+	"github.com/rafaelfigueiredo/auth-go/auth"
+	// Midlewares
 )
 
 // MAIN
 func main() {
-	var JWTServer auth.App
-	JWTServer.Init()
-	Run(JWTServer)
-}
-
-// Run start the server
-func Run(app auth.App) {
+	var JWTServer = auth.NewDefaultServer()
 
 	//PUBLIC ENDPOINTS
-	http.HandleFunc("/login", app.LoginHandler)
+	http.HandleFunc("/login", JWTServer.LoginHandler())
 
 	//PROTECTED ENDPOINTS
-	http.Handle("/resource/", negroni.New(
-		negroni.HandlerFunc(app.ValidateTokenMiddleware),
-		negroni.Wrap(http.HandlerFunc(ProtectedHandler)),
-	))
+	http.HandleFunc("/resource", JWTServer.ValidateTokenMiddleware(ProtectedHandler))
 
-	log.Printf("Now listening at %v", app.Port)
-	http.ListenAndServe(app.Port, nil)
+	log.Printf("Now listening at %v", JWTServer.Port)
+	http.ListenAndServe(JWTServer.Port, nil)
 }
-
-
 
 // ProtectedHandler is used to test access with JWT
 func ProtectedHandler(w http.ResponseWriter, r *http.Request) {
