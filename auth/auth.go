@@ -1,8 +1,8 @@
-/* Package auth is used to create a standalone server for authentication, or just use the library to validade requests.
-## Features
-* Token generated with this package is signed with RSA-512 to avoid sharing encryption key with clients.
-*/
 package auth
+
+//Package auth is used to create a standalone server for authentication, or just use the library to validade requests.
+// Features
+// Token generated with this package is signed with RSA-512 to avoid sharing encryption key with clients.
 
 import (
 	// stuff
@@ -96,7 +96,7 @@ func LoadRSAPrivateKey(path string) *rsa.PrivateKey {
 
 	signKey, err = jwt.ParseRSAPrivateKeyFromPEM(signStream)
 	if err != nil {
-		log.Fatal("error parsing RSA private key: %v\n", err)
+		log.Fatal(err)
 	}
 
 	return signKey
@@ -116,7 +116,7 @@ func LoadRSAPublicKey(path string) *rsa.PublicKey {
 	verifyKey, err = jwt.ParseRSAPublicKeyFromPEM(verifyStream)
 
 	if err != nil {
-		log.Fatal("error parsing RSA private key: %v\n", err)
+		log.Fatal(err)
 	}
 
 	return verifyKey
@@ -134,9 +134,9 @@ type User struct {
 
 // Auth Struct (MODEL)
 type Auth struct {
-	Login     string `json:"-"`
-	Password  string `json:"-"`
-	SecretKey string `json:"-"`
+	Login     string `json:"login"`
+	Password  string `json:"password"`
+	SecretKey string `json:"secret"`
 }
 
 // Response Definition
@@ -226,7 +226,7 @@ func (s *Server) LoginHandler() http.HandlerFunc {
 			secretKey string
 		)
 
-		log.Printf("%d", authFromRequest)
+		log.Printf("%v", authFromRequest)
 
 		//	Query just one row
 		err = stmt.QueryRow(authFromRequest.Login).Scan(&id, &name, &host, &id, &login, &password, &secretKey)
