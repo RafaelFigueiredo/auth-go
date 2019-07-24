@@ -1,6 +1,6 @@
-![](.\images\header.png)
+![](./images/header.png)
 
-# Sistema de Autenticação
+# Authentication System 
 
 [![GoDoc](https://godoc.org/github.com/RafaelFigueiredo/auth-go/auth?status.svg)](https://godoc.org/github.com/RafaelFigueiredo/auth-go/auth)
 
