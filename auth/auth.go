@@ -1,8 +1,12 @@
+// Package auth is used to create a standalone server for authentication, or just use the library to validade requests.
+// Features
+// * Token generated with this package is signed with RSA-512 to avoid sharing encryption key with clients.
+// * Cookie saved with HttpOnly to avoid XSS atacks
+// * Default handlers for login and logout
+// * Default middleware for validade token via api or saved in a cookie
 package auth
 
-//Package auth is used to create a standalone server for authentication, or just use the library to validade requests.
-// Features
-// Token generated with this package is signed with RSA-512 to avoid sharing encryption key with clients.
+
 
 import (
 	// stuff
