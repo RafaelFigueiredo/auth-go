@@ -1,8 +1,13 @@
 // Package auth is used to create a standalone server for authentication, or just use the library to validade requests.
-// Features
+//
+// Features:
+//
 // * Token generated with this package is signed with RSA-512 to avoid sharing encryption key with clients.
+//
 // * Cookie saved with HttpOnly to avoid XSS atacks
+//
 // * Default handlers for login and logout
+//
 // * Default middleware for validade token via api or saved in a cookie
 package auth
 
@@ -46,7 +51,7 @@ const (
 // Cookie store
 var store = sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
 
-// App config
+// ServerConfig  is used to config the server
 type ServerConfig struct {
 	SignKeyPath   string `json:"-"`
 	VerifyKeyPath string `json:"-"`
@@ -54,6 +59,7 @@ type ServerConfig struct {
 	LoginURL      string `json:"login-url"`
 }
 
+// Server struct the handlers and middleware for authentication
 type Server struct {
 	SignKey   *rsa.PrivateKey `json:"-"`
 	VerifyKey *rsa.PublicKey  `json:"-"`
@@ -61,10 +67,12 @@ type Server struct {
 	LoginURL  string          `json:"login-url"`
 }
 
+// NewDefaultServer create a server with default config options
 func NewDefaultServer() *Server {
 	return NewServer(ServerConfig{})
 }
 
+// NewServer create a server with custom config options
 func NewServer(config ServerConfig) *Server {
 	if config.SignKeyPath == "" {
 		config.SignKeyPath = defaultPrivateKeyPath
@@ -87,6 +95,7 @@ func NewServer(config ServerConfig) *Server {
 	}
 }
 
+// LoadRSAPrivateKey is a helper function that load a RSA private key from a file
 func LoadRSAPrivateKey(path string) *rsa.PrivateKey {
 	var err error
 	var signStream []byte
@@ -106,6 +115,7 @@ func LoadRSAPrivateKey(path string) *rsa.PrivateKey {
 	return signKey
 }
 
+// LoadRSAPublicKey is a helper function that load a RSA public key from a file
 func LoadRSAPublicKey(path string) *rsa.PublicKey {
 	var err error
 	var verifyStream []byte
