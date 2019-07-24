@@ -11,8 +11,6 @@
 // * Default middleware for validade token via api or saved in a cookie
 package auth
 
-
-
 import (
 	// stuff
 	"fmt"
@@ -33,7 +31,7 @@ import (
 
 	// database
 	"database/sql"
-
+	//it is just a driver
 	_ "github.com/go-sql-driver/mysql"
 
 	// encrypt
@@ -138,7 +136,7 @@ func LoadRSAPublicKey(path string) *rsa.PublicKey {
 
 // Model definition
 
-// User Struct (MODEL)
+// User struct define our default model to read users from database
 type User struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -146,14 +144,12 @@ type User struct {
 	Auth *Auth  `json:"-"`
 }
 
-// Auth Struct (MODEL)
+// Auth sruct define our (MODEL)
 type Auth struct {
 	Login     string `json:"login"`
 	Password  string `json:"password"`
 	SecretKey string `json:"secret"`
 }
-
-// Response Definition
 
 // Response define a default object to response, will be used with Ajax requests
 type Response struct {
@@ -175,7 +171,7 @@ type Token struct {
 	JWT string `json:"jwt"`
 }
 
-// Default responses
+// Default login responses
 var loginSuccessResponse = Response{
 	Status:  "success",
 	Message: "Logged with success.",
@@ -186,7 +182,7 @@ var loginErrorResponse = Response{
 	Message: "Login error. Please verify login and password",
 	Token:   &Token{}}
 
-// Handlers
+// LoginHandler handler incomming authentication requests
 func (s *Server) LoginHandler() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -295,6 +291,7 @@ func (s *Server) LoginHandler() http.HandlerFunc {
 	}
 }
 
+// LogoutHandler handler request to logout
 func (s *Server) LogoutHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get a session. Get() always returns a session, even if empty.
@@ -318,7 +315,8 @@ func (s *Server) LogoutHandler() http.HandlerFunc {
 	}
 }
 
-// Midlewares
+// ValidateCookieMiddleware verify is a token in HttpOnly is valid
+// BUG(rafaelfigueiredo) Verify if token come in http_only and if machine signature match
 func (s *Server) ValidateCookieMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		////////////////////////////
@@ -356,6 +354,7 @@ func (s *Server) ValidateCookieMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// ValidateTokenMiddleware verify is a token appended to a request is valid
 func (s *Server) ValidateTokenMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		//validate token
@@ -386,6 +385,7 @@ func (s *Server) ValidateTokenMiddleware(h http.HandlerFunc) http.HandlerFunc {
 }
 
 // Helper functions
+
 // JSONResponse take a object, parse to JSON and write it as a response
 func JSONResponse(response interface{}, w http.ResponseWriter) {
 
@@ -412,7 +412,8 @@ func checkPasswordHash(password, hash string) bool {
 	return err == nil
 }
 
-func (app Server) generateToken(user User) (string, error) {
+// generateToken create a JWT based on server config and user data.
+func (s Server) generateToken(user User) (string, error) {
 	//create a rsa 256 signer
 	signer := jwt.New(jwt.GetSigningMethod("RS256"))
 
@@ -424,16 +425,13 @@ func (app Server) generateToken(user User) (string, error) {
 	claims["iat"] = time.Now().Unix()
 	claims["aud"] = user.Host
 	/*
-		claims["iss"] = "admin"
-		claims["exp"] = time.Now().Add(time.Minute * 20).Unix()
-
-			claims["CustomUserInfo"] = struct {
-				Name string
-				Role string
-			}{user.Name, "Member"}*/
+		claims["CustomUserInfo"] = struct {
+			Name string
+			Role string
+		}{user.Name, "Member"}*/
 	signer.Claims = claims
 
-	tokenString, err := signer.SignedString(app.SignKey)
+	tokenString, err := signer.SignedString(s.SignKey)
 
 	return tokenString, err
 }
