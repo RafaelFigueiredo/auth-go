@@ -51,10 +51,27 @@ var store = sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
 
 // ServerConfig  is used to config the server
 type ServerConfig struct {
-	SignKeyPath   string `json:"-"`
-	VerifyKeyPath string `json:"-"`
-	Port          string `json:"-"`
-	LoginURL      string `json:"login-url"`
+	SignKeyPath   string          `json:"-"`
+	VerifyKeyPath string          `json:"-"`
+	RawSignKey    []byte          `json:"-"`
+	RawVerifyKey  []byte          `json:"-"`
+	Port          string          `json:"-"`
+	LoginURL      string          `json:"login-url"`
+	Database      *DatabaseConfig `json:"-"`
+}
+
+// DatabaseConfig store information to open connection to database
+type DatabaseConfig struct {
+	Host     string `json:"host"`
+	Database string `json:"database"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+func (db DatabaseConfig) getConnectionString() string {
+	connectionString := fmt.Sprintf("%s:%s@tcp(%s)/%s", db.Username, db.Password, db.Host, db.Database)
+	return connectionString
+	//return "root:a1b2c3d4e5@tcp(127.0.0.1:3306)/jujuba"
 }
 
 // Server struct the handlers and middleware for authentication
@@ -63,6 +80,7 @@ type Server struct {
 	VerifyKey *rsa.PublicKey  `json:"-"`
 	Port      string          `json:"-"`
 	LoginURL  string          `json:"login-url"`
+	Database  *DatabaseConfig `json:"-"`
 }
 
 // NewDefaultServer create a server with default config options
@@ -82,7 +100,17 @@ func NewServer(config ServerConfig) *Server {
 		config.Port = ":8000"
 	}
 	if config.LoginURL == "" {
-		config.LoginURL = "api/login"
+		config.LoginURL = "login"
+	}
+
+	emptyDBConfig := &DatabaseConfig{}
+	if config.Database == emptyDBConfig {
+		config.Database = &DatabaseConfig{
+			Host:     "127.0.0.1:3306",
+			Database: "jujuba",
+			Username: "root",
+			Password: "a1b2c3d4e5",
+		}
 	}
 
 	return &Server{
@@ -90,6 +118,7 @@ func NewServer(config ServerConfig) *Server {
 		VerifyKey: LoadRSAPublicKey(config.VerifyKeyPath),
 		Port:      config.Port,
 		LoginURL:  config.LoginURL,
+		Database:  config.Database,
 	}
 }
 
@@ -206,7 +235,7 @@ func (s *Server) LoginHandler() http.HandlerFunc {
 		//  username:password@tcp(host)/database
 		log.Println("Connecting to database...")
 
-		db, err := sql.Open("mysql", "root:a1b2c3d4e5@tcp(127.0.0.1:3306)/jujuba")
+		db, err := sql.Open("mysql", s.Database.getConnectionString())
 		if err != nil {
 			log.Fatal(err)
 		}
