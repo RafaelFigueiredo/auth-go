@@ -32,7 +32,7 @@ import (
 	// database
 	"database/sql"
 	//it is just a driver
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 
 	// encrypt
 	"crypto/rsa"
@@ -63,13 +63,19 @@ type ServerConfig struct {
 // DatabaseConfig store information to open connection to database
 type DatabaseConfig struct {
 	Host     string `json:"host"`
+	Port     int    `json:"port"`
 	Database string `json:"database"`
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
 func (db DatabaseConfig) getConnectionString() string {
-	connectionString := fmt.Sprintf("%s:%s@tcp(%s)/%s", db.Username, db.Password, db.Host, db.Database)
+	//connectionString := fmt.Sprintf("%s:%s@tcp(%s)/%s", db.Username, db.Password, db.Host, db.Database)
+
+	connectionString := fmt.Sprintf("host=%s port=%d user=%s "+
+		"password=%s dbname=%s sslmode=disable",
+		db.Host, db.Port, db.Username, db.Password, db.Database)
+
 	return connectionString
 	//return "root:a1b2c3d4e5@tcp(127.0.0.1:3306)/jujuba"
 }
@@ -235,7 +241,7 @@ func (s *Server) LoginHandler() http.HandlerFunc {
 		//  username:password@tcp(host)/database
 		log.Println("Connecting to database...")
 
-		db, err := sql.Open("mysql", s.Database.getConnectionString())
+		db, err := sql.Open("postgres", s.Database.getConnectionString())
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -245,7 +251,7 @@ func (s *Server) LoginHandler() http.HandlerFunc {
 		// SELECT * FROM profiles INNER JOIN auth ON profiles.profile_id = auth.profile_id WHERE auth.login=?
 		log.Println("Preparing statement...")
 
-		stmt, err := db.Prepare("SELECT * FROM profiles INNER JOIN auth ON profiles.profile_id = auth.profile_id WHERE auth.login=?")
+		stmt, err := db.Prepare("SELECT * FROM users INNER JOIN auth ON users.id = auth.user_id WHERE users.login=$1")
 
 		if err != nil {
 			log.Fatal(err)
@@ -437,6 +443,7 @@ func hashPassword(password string) (string, error) {
 
 // checkPasswordHash compare a plain passwort to a hash and return true if match
 func checkPasswordHash(password, hash string) bool {
+	log.Printf("BCrypt....password: %s , with hash: %s", password, hash)
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
 }
