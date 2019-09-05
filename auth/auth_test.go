@@ -16,7 +16,7 @@ func TestConnectionString(t *testing.T) {
 		"root:a1b2c3d4e5@tcp(127.0.0.1:3306)/jujuba",
 	}
 
-	c := tt.dbConfig.getConnectionString()
+	c := tt.dbConfig.GetConnectionString()
 
 	if c != tt.connectionString {
 		t.Errorf("Connection string error, expected:, got:%s", c)

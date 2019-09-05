@@ -70,17 +70,15 @@ type DatabaseConfig struct {
 	ConnectionString string `json:"connection_string"`
 }
 
-func (db DatabaseConfig) getConnectionString() string {
+func (db *DatabaseConfig) GetConnectionString() string {
 	//connectionString := fmt.Sprintf("%s:%s@tcp(%s)/%s", db.Username, db.Password, db.Host, db.Database)
 
 	if db.ConnectionString == "" {
-		connectionString := fmt.Sprintf("host=%s port=%d user=%s "+
+		db.ConnectionString = fmt.Sprintf("host=%s port=%d user=%s "+
 			"password=%s dbname=%s sslmode=disable", db.Host, db.Port, db.Username, db.Password, db.Database)
-		return connectionString
 	}
 
 	return db.ConnectionString
-	//return "root:a1b2c3d4e5@tcp(127.0.0.1:3306)/jujuba"
 }
 
 // Server struct the handlers and middleware for authentication
@@ -121,6 +119,8 @@ func NewServer(config ServerConfig) *Server {
 			Password: "a1b2c3d4e5",
 		}
 	}
+
+	_ = config.Database.GetConnectionString()
 
 	return &Server{
 		SignKey:   LoadRSAPrivateKey(config.SignKeyPath),
@@ -244,7 +244,7 @@ func (s *Server) LoginHandler() http.HandlerFunc {
 		//  username:password@tcp(host)/database
 		log.Println("Connecting to database...")
 
-		db, err := sql.Open("postgres", s.Database.getConnectionString())
+		db, err := sql.Open("postgres", s.Database.GetConnectionString())
 		if err != nil {
 			log.Fatal(err)
 		}
