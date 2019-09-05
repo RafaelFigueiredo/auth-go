@@ -62,21 +62,24 @@ type ServerConfig struct {
 
 // DatabaseConfig store information to open connection to database
 type DatabaseConfig struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Database string `json:"database"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Host             string `json:"host"`
+	Port             int    `json:"port"`
+	Database         string `json:"database"`
+	Username         string `json:"username"`
+	Password         string `json:"password"`
+	ConnectionString string `json:"connection_string"`
 }
 
 func (db DatabaseConfig) getConnectionString() string {
 	//connectionString := fmt.Sprintf("%s:%s@tcp(%s)/%s", db.Username, db.Password, db.Host, db.Database)
 
-	connectionString := fmt.Sprintf("host=%s port=%d user=%s "+
-		"password=%s dbname=%s sslmode=disable",
-		db.Host, db.Port, db.Username, db.Password, db.Database)
+	if db.ConnectionString == "" {
+		connectionString := fmt.Sprintf("host=%s port=%d user=%s "+
+			"password=%s dbname=%s sslmode=disable", db.Host, db.Port, db.Username, db.Password, db.Database)
+		return connectionString
+	}
 
-	return connectionString
+	return db.ConnectionString
 	//return "root:a1b2c3d4e5@tcp(127.0.0.1:3306)/jujuba"
 }
 
